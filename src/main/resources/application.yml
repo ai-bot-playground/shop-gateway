@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: shop-gateway
+  cloud:
+    gateway:
+      routes:
+        - id: catalog
+          uri: ${CATALOG_SERVICE_URI:http://shop-catalog:8080}
+          predicates:
+            - Path=/api/products/**
+          filters:
+            - StripPrefix=1
+        - id: order
+          uri: ${ORDER_SERVICE_URI:http://shop-order:8080}
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - StripPrefix=1
+        - id: inventory
+          uri: ${INVENTORY_SERVICE_URI:http://shop-inwentory:8080}
+          predicates:
+            - Path=/api/inventory/**
+          filters:
+            - StripPrefix=1
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
