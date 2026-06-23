@@ -17,7 +17,7 @@ spring:
           filters:
             - StripPrefix=1
         - id: inventory
-          uri: ${INVENTORY_SERVICE_URI:http://shop-inwentory:8080}
+          uri: ${INVENTORY_SERVICE_URI:http://shop-inventory:8080}
           predicates:
             - Path=/api/inventory/**
           filters:

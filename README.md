@@ -11,7 +11,7 @@ Trasy do serwisów po wewnętrznych adresach sieci `backend` (z env):
 |--------------------|--------------------------------------|
 | `/api/products/**` | `CATALOG_SERVICE_URI` → shop-catalog |
 | `/api/orders/**`   | `ORDER_SERVICE_URI` → shop-order     |
-| `/api/inventory/**`| `INVENTORY_SERVICE_URI` → shop-inwentory |
+| `/api/inventory/**`| `INVENTORY_SERVICE_URI` → shop-inventory |
 
 ## Rate limiting (krytyczne przy flash sale)
 `RequestRateLimiter` oparty o Redis (token bucket): `replenishRate`,
