@@ -35,3 +35,31 @@ zawierać `curl` (lub `wget`) dla healthchecku.
 ## Skalowanie
 Bezstanowy → wiele instancji. Liczniki rate limitingu są w Redis, więc limit
 działa spójnie niezależnie od liczby instancji Gateway.
+
+## High Level Design (ogólny workflow)
+
+Reaktywny punkt wejścia (Netty). Dopasowuje trasę po predykacie ścieżki, zdejmuje
+prefiks `/api` (`StripPrefix=1`) i przekazuje do serwisu po DNS sieci `backend`.
+Rate limiting (Redis) i JWT to warstwy docelowe.
+
+```mermaid
+flowchart LR
+    UI["shop-ui / clients"] -->|"/api/**"| GW["shop-gateway (Spring Cloud Gateway)"]
+    GW -->|"/api/products"| CAT["shop-catalog"]
+    GW -->|"/api/orders"| ORD["shop-order"]
+    GW -->|"/api/inventory"| INV["shop-inventory"]
+    GW -. "future: rate limit" .-> R[("Redis")]
+```
+
+## Low Level Design (diagram aktywności)
+
+```mermaid
+flowchart TD
+    A(["żądanie /api/**"]) --> B{"pasuje predykat trasy?"}
+    B -- nie --> N(["404"])
+    B -- tak --> C{"(future) rate limit?"}
+    C -- "przekroczony" --> L(["429 Too Many Requests"])
+    C -- ok --> D["StripPrefix=1"]
+    D --> E["forward do serwisu docelowego"]
+    E --> F(["relay odpowiedzi"])
+```
