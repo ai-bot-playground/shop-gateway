@@ -1,65 +1,42 @@
 # shop-gateway
 
-API Gateway (Spring Cloud Gateway, reaktywny, na Netty). Jedyny publiczny punkt
-wejścia do backendu i pierwsza linia obrony przed przeciążeniem. Standalone repo
-z własnym `Dockerfile` (multi-stage: build → JRE) i kodem.
+Reaktywny API Gateway (Spring Cloud Gateway 2025.1 / Spring Boot 4 / Netty) — jedyny publiczny punkt wejścia do backendu.
+
+## Stack
+
+- Java 25, Spring Boot 4.0.7, Spring Cloud Gateway 2025.1.2 (WebFlux)
+- Budowanie: Gradle 9.6, multi-stage Docker (`gradle:9.6.0-jdk25` → `eclipse-temurin:25-jre-alpine`)
+- Obserwowalność: Actuator (`/actuator/health`, `/actuator/info`)
 
 ## Routing
-Trasy do serwisów po wewnętrznych adresach sieci `backend` (z env):
 
-| Ścieżka            | Cel                                  |
-|--------------------|--------------------------------------|
-| `/api/products/**` | `CATALOG_SERVICE_URI` → shop-catalog |
-| `/api/orders/**`   | `ORDER_SERVICE_URI` → shop-order     |
-| `/api/inventory/**`| `INVENTORY_SERVICE_URI` → shop-inventory |
+`StripPrefix=1` na każdej trasie (usuwa `/api` przed forwardem).
 
-## Rate limiting (krytyczne przy flash sale)
-`RequestRateLimiter` oparty o Redis (token bucket): `replenishRate`,
-`burstCapacity`. `KeyResolver` ustala klucz limitu (po IP lub `userId` z tokenu).
-Cel: odciąć boty i wielokrotne kliknięcia, zanim ruch dotrze do serwisów. Po
-przekroczeniu → `429 Too Many Requests`.
+| Ścieżka             | Env var               | Domyślny cel               |
+|---------------------|-----------------------|----------------------------|
+| `/api/products/**`  | `CATALOG_SERVICE_URI` | `http://shop-catalog:8080` |
+| `/api/orders/**`    | `ORDER_SERVICE_URI`   | `http://shop-order:8080`   |
+| `/api/inventory/**` | `INVENTORY_SERVICE_URI` | `http://shop-inventory:8080` |
 
-## Uwierzytelnianie
-Walidacja JWT (Spring Security Resource Server, `JWT_ISSUER_URI`). Odrzuca
-nieuwierzytelnione żądania do chronionych ścieżek, przekazuje tożsamość dalej
-(np. `X-User-Id`). Przeglądanie katalogu może być publiczne.
+## Uruchomienie
 
-## Odporność
-Circuit breaker (Resilience4j) i timeouty na trasach do serwisów; retry tylko dla
-idempotentnych GET; CORS dla origin shop-ui (http://localhost:3000).
+```bash
+# lokalnie
+./gradlew bootRun
 
-## Obserwowalność / health
-Actuator (`/actuator/health`, `/actuator/prometheus`). Dockerfile runtime musi
-zawierać `curl` (lub `wget`) dla healthchecku.
-
-## Skalowanie
-Bezstanowy → wiele instancji. Liczniki rate limitingu są w Redis, więc limit
-działa spójnie niezależnie od liczby instancji Gateway.
-
-## High Level Design (ogólny workflow)
-
-Reaktywny punkt wejścia (Netty). Dopasowuje trasę po predykacie ścieżki, zdejmuje
-prefiks `/api` (`StripPrefix=1`) i przekazuje do serwisu po DNS sieci `backend`.
-Rate limiting (Redis) i JWT to warstwy docelowe.
-
-```mermaid
-flowchart LR
-    UI["shop-ui / clients"] -->|"/api/**"| GW["shop-gateway (Spring Cloud Gateway)"]
-    GW -->|"/api/products"| CAT["shop-catalog"]
-    GW -->|"/api/orders"| ORD["shop-order"]
-    GW -->|"/api/inventory"| INV["shop-inventory"]
-    GW -. "future: rate limit" .-> R[("Redis")]
+# Docker
+docker build -t shop-gateway:local .
+docker run -p 8080:8080 shop-gateway:local
 ```
 
-## Low Level Design (diagram aktywności)
+## Kubernetes (preprod)
 
-```mermaid
-flowchart TD
-    A(["żądanie /api/**"]) --> B{"pasuje predykat trasy?"}
-    B -- nie --> N(["404"])
-    B -- tak --> C{"(future) rate limit?"}
-    C -- "przekroczony" --> L(["429 Too Many Requests"])
-    C -- ok --> D["StripPrefix=1"]
-    D --> E["forward do serwisu docelowego"]
-    E --> F(["relay odpowiedzi"])
+Namespace `shop`, ClusterIP na porcie 8080, health probe na `/actuator/health`.
+
+```bash
+kubectl --context kind-preprod apply -f k8s/shop-gateway.yaml
 ```
+
+## CI
+
+Każdy PR uruchamia preprod gate (`.github/workflows/pr-to-main.yml`) — buduje obraz, wdraża na `kind-preprod` i odpala acceptance testy z `shop-acceptance-tests`.
