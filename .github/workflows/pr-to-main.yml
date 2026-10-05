@@ -10,6 +10,6 @@ on:
 
 jobs:
   preprod-gate:
-    uses: ai-bot-playground/shop-acceptance-tests/.github/workflows/gate.yml@main
+    uses: ai-bot-playground/shop-acceptance-tests/.github/workflows/gate.yml@fix/gate-restore-baseline-on-failure
     with:
       service: shop-gateway
