@@ -24,7 +24,7 @@ spring:
             - id: inventory
               uri: ${INVENTORY_SERVICE_URI:http://shop-inventory:8080}
               predicates:
-                - Path=/api/inventory/**
+                - Path=/api/stock/**
               filters:
                 - StripPrefix=1
 management:
